@@ -1,16 +1,9 @@
 import { NextFunction, Request, Response, Router } from "express"
+import { AuthService, CsvService }  from "../services";
 import path from "path";
-import  usersService  from "../services";
+import { loginSchema } from "../models/data.schema";
 import jwt from "jsonwebtoken";
-import { validationHandler } from "../middleware/validation-data";
-import { dataSchema, loginSchema } from "../models/login.schema";
 import multer from "multer";
-import { readFile } from "fs/promises";
-const { parse } = require("csv-parse/sync");
-/* import Papa from "papaparse"; */
-/* import fs from "fs"; */
-
-
 
 export const router = Router();
 const upload = multer({dest: 'uploads/'});
@@ -20,11 +13,10 @@ router.get('/', (_req:Request, res:Response) => {
 });
 
 router.post('/login', 
-    validationHandler(loginSchema), 
-    async (req, res, next) => {
+    async (req:Request, res:Response, next:NextFunction) => {
         try {
-        const { email, password } = req.body;
-        const user = await usersService.login(email, password);
+        const { email, password } = loginSchema.parse(req.body);
+        const user = await AuthService(email, password);
 
         const payload = {
             id: user.id,
@@ -40,26 +32,19 @@ router.post('/login',
             data: token,
         })
         } catch (error) {
-        next(error);
+          next(error);
         }
 })
 
-router.post(
-  "/upload",
-  validationHandler(dataSchema), 
-  upload.single("file"), 
-  (req: Request, res: Response,next : NextFunction) => {
+router.post("/upload",
+   upload.single("file"), 
+   async (req: Request, res: Response, next : NextFunction) => {
   try {
-    const file = req.file?.path as string;
-
-    const data = readFile(file, "utf-8");
-    const parsedData = parse(data)
-
-    res.status(200).json({
-      ok: true,
-      data: parsedData,
-    });
+    const result = await CsvService(req.file);
+    res.status(200).json(result);
   } catch (error) {
     next(error);
   }
-}); 
+});
+  
+    
