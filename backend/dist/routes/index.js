@@ -7,7 +7,7 @@ exports.router = void 0;
 const express_1 = require("express");
 const services_1 = require("../services");
 const path_1 = __importDefault(require("path"));
-const login_schema_1 = require("../models/login.schema");
+const data_schema_1 = require("../models/data.schema");
 const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
 const multer_1 = __importDefault(require("multer"));
 exports.router = (0, express_1.Router)();
@@ -17,7 +17,7 @@ exports.router.get('/', (_req, res) => {
 });
 exports.router.post('/login', async (req, res, next) => {
     try {
-        const { email, password } = login_schema_1.loginSchema.parse(req.body);
+        const { email, password } = data_schema_1.loginSchema.parse(req.body);
         const user = await (0, services_1.AuthService)(email, password);
         const payload = {
             id: user.id,

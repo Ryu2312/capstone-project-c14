@@ -8,8 +8,8 @@ exports.CsvService = CsvService;
 const data_1 = require("../data");
 const error_handler_1 = require("../middleware/error-handler");
 const bcrypt_1 = __importDefault(require("bcrypt"));
-const login_schema_1 = require("../models/login.schema");
-const validation_data_1 = require("../middleware/validation-data");
+const data_schema_1 = require("../models/data.schema");
+const utils_1 = require("../utils");
 const zod_1 = require("zod");
 const promises_1 = __importDefault(require("fs/promises"));
 const papaparse_1 = __importDefault(require("papaparse"));
@@ -31,7 +31,7 @@ async function CsvService(file) {
         throw new Error("No se envió un archivo");
     }
     const fileCount = {
-        succesfully: 0,
+        success: 0,
         failed: [],
     };
     try {
@@ -46,39 +46,47 @@ async function CsvService(file) {
                 csvFile.push(...results.data);
             }
         });
-        for (const [index, line] of csvFile.entries()) {
-            const user = await data_1.UserData.verifyData({ email: line.email });
-            if (user) {
-                fileCount.failed.push({
-                    row: index + 1,
-                    data: line,
-                    message: "Email ya registrado",
-                });
-                continue;
-            }
+        for (const [index, row] of csvFile.entries()) {
             try {
-                const validatedData = login_schema_1.dataRegister.parse(line);
-                const hashedPassword = await bcrypt_1.default.hash(validatedData.password, 10);
-                const rowCount = await data_1.UserData.insertData({ ...validatedData, password: hashedPassword });
-                fileCount.succesfully += rowCount;
+                // Validar fila usando Zod
+                const validData = data_schema_1.dataRegister.parse(row);
+                // Verificar si el usuario ya existe
+                const userExists = await data_1.UserData.verifyData({ email: validData.email });
+                if (userExists) {
+                    fileCount.failed.push({
+                        row: index + 1,
+                        data: row,
+                        issues: "Email ya registrado",
+                    });
+                    continue;
+                }
+                // Hashear contraseña
+                const hashedPassword = await bcrypt_1.default.hash(validData.password, 10);
+                // Guardar datos en la base de datos
+                const result = await data_1.UserData.insertData({ ...validData, password: hashedPassword });
+                //result es el número de filas afectadas puede ser 1 o 0;
+                fileCount.success += result;
             }
             catch (error) {
                 if (error instanceof zod_1.ZodError) {
+                    // Capturar errores de validación
                     fileCount.failed.push({
                         row: index + 1,
-                        data: line,
-                        message: (0, validation_data_1.formatIssues)(error.issues),
+                        data: row,
+                        issues: (0, utils_1.formatIssues)(error.issues),
                     });
                 }
                 else {
+                    // Capturar otros errores
                     fileCount.failed.push({
                         row: index + 1,
-                        data: line,
-                        message: "Error inesperado",
+                        data: row,
+                        issues: "Error desconocido al procesar esta fila.",
                     });
                 }
             }
         }
+        //Borrar el archivo csv
         await promises_1.default.unlink(file.path);
     }
     catch (error) {

@@ -1,7 +1,7 @@
 import { UserData  } from "../data";
 import { ApiError } from "../middleware/error-handler";
 import bcrypt from "bcrypt";
-import { dataRegister, DataRegister } from "../models/data.schema";
+import { dataRegister, DataRegister, ImportResult } from "../models/data.schema";
 import { formatIssues } from "../utils";
 import { ZodError } from "zod";
 import fs from "fs/promises";
@@ -29,11 +29,8 @@ import Papa from "papaparse";
     throw new Error("No se envió un archivo");
   }
 
-  const fileCount: { 
-    succesfully: number; 
-    failed: { row: number; data: DataRegister; message: string }[]; 
-  } = {
-    succesfully: 0,
+  const fileCount: ImportResult = {
+    success: 0,
     failed: [],
   };
 
@@ -51,42 +48,52 @@ import Papa from "papaparse";
         }
     });
 
-    for (const [index, line] of csvFile.entries()) {
-      const user = await UserData .verifyData({ email: line.email });
+    for (const [index, row] of csvFile.entries()) {
+        try {
+          // Validar fila usando Zod
+          const validData = dataRegister.parse(row);
 
-      if (user) {
-        fileCount.failed.push({
-          row: index + 1,
-          data: line,
-          message: "Email ya registrado",
-        });
-        continue;
-      }
+          // Verificar si el usuario ya existe
+          const userExists = await UserData.verifyData({ email: validData.email });
 
-      try {
-        const validatedData = dataRegister.parse(line);
-        const hashedPassword = await bcrypt.hash(validatedData.password, 10);
+          if (userExists) {
+            fileCount.failed.push({
+              row: index + 1,
+              data: row,
+              issues: "Email ya registrado",
+            });
+            continue;
+          }
 
-        const rowCount = await UserData .insertData({ ...validatedData, password: hashedPassword });
-        fileCount.succesfully += rowCount;
-      } catch (error) {
-        if (error instanceof ZodError) {
-          fileCount.failed.push({
-            row: index + 1,
-            data: line,
-            message: formatIssues(error.issues),
-          });
-        } else {
-          fileCount.failed.push({
-            row: index + 1,
-            data: line,
-            message: "Error inesperado",
-          });
+          // Hashear contraseña
+          const hashedPassword = await bcrypt.hash(validData.password, 10);
+
+          // Guardar datos en la base de datos
+          const result = await UserData.insertData({ ...validData, password: hashedPassword });
+          
+          //result es el número de filas afectadas puede ser 1 o 0;
+          fileCount.success += result;
+        } catch (error) {
+          if (error instanceof ZodError) {
+            // Capturar errores de validación
+            fileCount.failed.push({
+              row: index + 1,
+              data: row,
+              issues: formatIssues(error.issues),
+            });
+          } else {
+            // Capturar otros errores
+            fileCount.failed.push({
+              row: index + 1,
+              data: row,
+              issues: "Error desconocido al procesar esta fila." ,
+            });
+          }
         }
       }
-    }
-
+    //Borrar el archivo csv
     await fs.unlink(file.path);
+
   } catch (error) {
     throw new ApiError("Error al procesar el archivo CSV", 500);
   }

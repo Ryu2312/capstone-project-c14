@@ -45,3 +45,15 @@ export type Login = z.infer<typeof loginSchema>;
 export const dataRegister = dataSchema.omit({ id: true });
 
 export type DataRegister = z.infer<typeof dataRegister>;
+
+
+export interface failed { 
+    row: number; 
+    data: DataRegister; 
+    issues: string 
+}
+
+export interface ImportResult {
+    success: number; 
+    failed: failed[]; 
+}
