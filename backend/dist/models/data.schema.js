@@ -3,11 +3,11 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.dataRegister = exports.loginSchema = exports.dataSchema = void 0;
+exports.loginSchema = exports.dataSchema = void 0;
 const zod_1 = __importDefault(require("zod"));
 // Esquema de validación para los datos generales
 exports.dataSchema = zod_1.default.object({
-    id: zod_1.default.number(),
+    id: zod_1.default.number().optional(),
     name: zod_1.default
         .string({
         required_error: "name es requerido.",
@@ -37,5 +37,3 @@ exports.loginSchema = exports.dataSchema.pick({
     email: true,
     password: true,
 });
-// Tipo para los datos de registro, sin el `id`
-exports.dataRegister = exports.dataSchema.omit({ id: true });

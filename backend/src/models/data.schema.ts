@@ -2,7 +2,7 @@ import z from "zod";
 
 // Esquema de validación para los datos generales
 export const dataSchema = z.object({
-    id: z.number(),
+    id: z.number().optional(),
     name: z
         .string({
             required_error: "name es requerido.",
@@ -28,7 +28,6 @@ export const dataSchema = z.object({
     role: z.enum(["user", "admin"]).optional().default("user"),
 });
 
-// Tipo para los datos generados por la base de datos, incluyendo el `id`
 export type DataFromDb = z.infer<typeof dataSchema>;
 
 
@@ -40,20 +39,14 @@ export const loginSchema = dataSchema.pick({
 
 export type Login = z.infer<typeof loginSchema>;
 
-
-// Tipo para los datos de registro, sin el `id`
-export const dataRegister = dataSchema.omit({ id: true });
-
-export type DataRegister = z.infer<typeof dataRegister>;
-
-
-export interface failed { 
-    row: number; 
-    data: DataRegister; 
-    issues: string 
+export interface Result {
+  row?: number;
+  data: DataFromDb;
+  issues?: IssuesData[] | string;
 }
 
-export interface ImportResult {
-    success: number; 
-    failed: failed[]; 
+export interface IssuesData {
+  name?: string;
+  email?: string;
+  age?: string;
 }
